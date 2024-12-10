@@ -79,22 +79,28 @@ const Child = () => {
   const { sendTransaction, publicKey } = useWallet();
   const wallet = useAnchorWallet() as NodeWallet;
   const { connection } = useConnection();
+  const { program, provider, authority } = getProgram(
+    connection,
+    wallet as AnchorWallet,
+    idl,
+    CONFIG.programId,
+    new PublicKey(CONFIG.ownerTokenAccount),
+  );
 
-  async function send() {
-    const { program, provider, authority } = getProgram(
-      connection,
-      wallet as AnchorWallet,
-      idl,
-      CONFIG.programId,
-      new PublicKey(CONFIG.ownerTokenAccount),
-      BonkArena as any
-    );
+  if (!wallet || !wallet.publicKey) {
+    return <p>Please connect your wallet to access this feature.</p>;
+  }
 
-    const [leaderboardPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("leaderboard")],
-      program.programId
-    );
-
+  const [leaderboardPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("leaderboard")],
+    program.programId
+  );
+  const [gameSessionPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("player_session"), wallet.publicKey.toBuffer()],
+    program.programId
+  );
+  async function getLeaderboard() {
+    
     const leaderboardAccount = await program.account.leaderboard.fetch(
       leaderboardPda
     );
@@ -102,22 +108,43 @@ const Child = () => {
       prizePool: leaderboardAccount.prizePool.toString(),
       players: leaderboardAccount.players,
     });
-  }
+  };
+
+  const startGame = async (gameName: string) => {
+      const leaderboardAccount = await program.account.leaderboard.fetch(
+        leaderboardPda
+      );
+      const contributorTokenAccount = await getAssociatedTokenAddress(
+        leaderboardAccount.tokenMint,
+        wallet.publicKey
+      );
+      const tokenPoolAccount = await getAssociatedTokenAddress(
+        leaderboardAccount.tokenMint,
+        leaderboardPda,
+        true
+      );
+      
+      console.log("Game Session PDA:", gameSessionPda.toString());
+
+
+      console.log("Token Pool Account:", tokenPoolAccount.toString());
+
+      const tx = await program.methods
+        .startGame(gameName)
+        .accounts({
+          leaderboard: leaderboardPda,
+          gameSession: gameSessionPda,
+          payerTokenAccount: contributorTokenAccount,
+          tokenPool: tokenPoolAccount,
+          payer: wallet.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      console.log("Transaction:", tx);
+  };
 
   const addPrizePool = async (amount: number) => {
-    const { program, provider, authority } = getProgram(
-      connection,
-      wallet as AnchorWallet,
-      idl,
-      CONFIG.programId,
-      new PublicKey(CONFIG.ownerTokenAccount),
-      BonkArena as any
-    );
-
-    const [leaderboardPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("leaderboard")],
-      program.programId
-    );
 
     const leaderboardAccount = await program.account.leaderboard.fetch(
       leaderboardPda
@@ -154,17 +181,44 @@ const Child = () => {
 
     console.log("Transaction:", tx);
   };
+
+  const endGame = async (score: number) => {
+    const leaderboardAccount = await program.account.leaderboard.fetch(
+      leaderboardPda
+    );
+    const contributorTokenAccount = await getAssociatedTokenAddress(
+      leaderboardAccount.tokenMint,
+      wallet.publicKey
+    );
+    const tokenPoolAccount = await getAssociatedTokenAddress(
+      leaderboardAccount.tokenMint,
+      leaderboardPda,
+      true
+    );
+    const tx = await program.methods
+      .endGame(new anchor.BN(score))
+      .accounts({
+        leaderboard: leaderboardPda,
+        gameSession: gameSessionPda,
+        payer: wallet.publicKey,
+      })
+      .rpc();
+
+    console.log("Transaction:", tx);
+    console.log("End Game");
+  };
+
+
   return (
     <div>
-      <h1>Hello</h1>
       <button
         onClick={() => {
           //     const { program, provider, authority } = getProgram(connection, wallet as AnchorWallet, idl, CONFIG.programId, new PublicKey(CONFIG.ownerTokenAccount));
           // console.log(program, provider, authority);
-          send();
+          getLeaderboard();
         }}
       >
-        test get program
+        get leaderboard
       </button>
       <br />
       <button
@@ -172,7 +226,23 @@ const Child = () => {
           addPrizePool(1000);
         }}
       >
-        test add prize pool
+        add prize pool
+      </button>
+      <br />
+      <button
+        onClick={() => {
+          startGame("Game 1");
+        }}
+      >
+        start game
+      </button>
+      <br />
+      <button
+        onClick={() => {
+          endGame(100);
+        }}
+      >
+        end game
       </button>
     </div>
   );

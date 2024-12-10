@@ -16,8 +16,7 @@ export const getProgram = (
   wallet: AnchorWallet,
   idl: any,
   contractAddress: string,
-  authority: PublicKey, // Add authority parameter,
-  programType: any
+  authority: PublicKey, // Add authority parameter
 ) => {
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
