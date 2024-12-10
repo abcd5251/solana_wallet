@@ -1,6 +1,3 @@
-import { CONFIG } from "../config/config";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN, AnchorProvider } from "@coral-xyz/anchor";
 import {
